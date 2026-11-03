@@ -21,6 +21,7 @@ INDIRIMLI_FARK = 0.300   # indirimli fiyat = gram + 0,300 has
 PARA_BIRIMI = "HAS"
 MARKA = "Saveru"
 STOK_KODU_ONEK = "CA-"   # dükkan ürünlerinden ayırt etmek için
+HARIC_AYARLAR = {"22"}   # şimdilik satılmayan ayarlar; 22 ayar satışa açılınca boş küme yap
 
 KLASOR = Path(__file__).resolve().parent
 CIKTI_KLASOR = Path(os.environ.get("CIKTI_KLASOR", KLASOR))
@@ -94,7 +95,7 @@ def donustur(kaynak_xml):
     eslesmeyen = {}
     root = ET.Element("Root")
     urunler = alt(root, "Urunler")
-    sayac = {"aktarilan": 0, "gramsiz": 0, "kategorisiz": 0}
+    sayac = {"aktarilan": 0, "gramsiz": 0, "kategorisiz": 0, "haric_ayar": 0}
 
     for p in ET.fromstring(kaynak_xml).findall("Product"):
         if p.get("Published") != "True":
@@ -105,6 +106,9 @@ def donustur(kaynak_xml):
             sayac["gramsiz"] += 1
             continue
         ayar = re.sub(r"\D", "", ozellik.get("Ayar", "")) or "14"
+        if ayar in HARIC_AYARLAR:
+            sayac["haric_ayar"] += 1
+            continue
         ad = bosluk(p.get("Name"))
 
         yollar = [bosluk(c.get("Path")) for c in p.find("Categories")]
@@ -211,6 +215,7 @@ def main():
         sys.exit(f"Çok az ürün aktarıldı ({sayac['aktarilan']}), yayın durduruldu.")
     print(f"Aktarılan ürün: {sayac['aktarilan']}")
     print(f"Gramı olmadığı için atlanan: {sayac['gramsiz']}")
+    print(f"Satışa kapalı ayar ({', '.join(sorted(HARIC_AYARLAR))}) olduğu için atlanan: {sayac['haric_ayar']}")
     print(f"Kategorisi eşleşmediği için atlanan: {sayac['kategorisiz']}")
     if eslesmeyen:
         print(f"Tabloda olmayan {len(eslesmeyen)} toptancı kategorisi var -> {ESLESMEYEN.name}")
