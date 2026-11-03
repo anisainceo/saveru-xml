@@ -1,0 +1,40 @@
+name: XML güncelle
+
+on:
+  schedule:
+    - cron: "17 */3 * * *"   # 3 saatte bir
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  guncelle:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.yayin.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Toptancı XML'ini dönüştür
+        env:
+          KAYNAK_URL: ${{ secrets.KAYNAK_URL }}
+          CIKTI_KLASOR: yayin
+        run: python3 donustur.py
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: yayin
+      - id: yayin
+        uses: actions/deploy-pages@v4
