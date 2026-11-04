@@ -153,6 +153,10 @@ def donustur(kaynak_xml):
         ek = alt(u, "EkKategoriler")
         for k in kategoriler[1:]:
             alt(ek, "KategoriTree", k)
+        # Connect "Kategorileri Çoklu Alandan Oku": kök Kategoriler, öğe KategoriTree (ana + ek hepsi)
+        hepsi = alt(u, "Kategoriler")
+        for k in kategoriler:
+            alt(hepsi, "KategoriTree", k)
         alt(u, "Gram", f"{gram:.2f}")
         alt(u, "OzelAlan1", tr_sayi(gram))
         alt(u, "SeoBaslik", seo_baslik(ad, ayar, gram))
