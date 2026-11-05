@@ -38,3 +38,7 @@ jobs:
           path: yayin
       - id: yayin
         uses: actions/deploy-pages@v4
+      - name: Ek kategorileri Ticimax'e ekle (web servisi)
+        env:
+          TICIMAX_WS_KODU: ${{ secrets.TICIMAX_WS_KODU }}
+        run: python3 ek_kategori.py yayin/saveru-urunler.xml --uygula
