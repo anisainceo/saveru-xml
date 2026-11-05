@@ -41,4 +41,4 @@ jobs:
       - name: Ek kategorileri Ticimax'e ekle (web servisi)
         env:
           TICIMAX_WS_KODU: ${{ secrets.TICIMAX_WS_KODU }}
-        run: python3 ek_kategori.py yayin/saveru-urunler.xml   # test bitene kadar deneme modu
+        run: python3 ek_kategori.py yayin/saveru-urunler.xml --uygula
