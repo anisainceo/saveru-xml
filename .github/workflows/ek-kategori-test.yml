@@ -1,0 +1,30 @@
+name: Ek kategori (elle)
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Kaç ürün (0 = hepsi)"
+        default: "5"
+      uygula:
+        description: "Gerçekten yaz"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  ek-kategori:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Yayındaki XML'i indir
+        run: curl -sfL -o saveru-urunler.xml https://anisainceo.github.io/saveru-xml/saveru-urunler.xml
+      - name: Ek kategorileri ekle
+        env:
+          TICIMAX_WS_KODU: ${{ secrets.TICIMAX_WS_KODU }}
+        run: python3 ek_kategori.py saveru-urunler.xml --limit ${{ inputs.limit }} ${{ inputs.uygula && '--uygula' || '' }}
