@@ -8,6 +8,7 @@ import collections
 import csv
 import html
 import os
+import re
 import smtplib
 import sys
 from datetime import datetime, timedelta, timezone
@@ -55,7 +56,7 @@ def main():
     m = EmailMessage()
     m["Subject"] = f"Saveru XML: {len(satirlar)} ürün aktarılmadı ({zaman})"
     m["From"] = kullanici
-    m["To"] = alici
+    m["To"] = ", ".join(a for a in re.split(r"[\s,;]+", alici) if a)  # alt alta / virgülle birden fazla alıcı
     m.set_content("Rapor HTML olarak hazırlandı; tam liste ekteki CSV dosyasında.")
     m.add_alternative("".join(parca), subtype="html")
     m.add_attachment(yol.read_bytes(), maintype="text", subtype="csv",
