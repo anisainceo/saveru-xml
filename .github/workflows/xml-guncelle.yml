@@ -31,7 +31,15 @@ jobs:
         env:
           KAYNAK_URL: ${{ secrets.KAYNAK_URL }}
           CIKTI_KLASOR: yayin
+          RAPOR_KLASOR: rapor
         run: python3 donustur.py
+      - name: Aktarılmayan ürün raporunu mail at
+        continue-on-error: true   # mail sorunu XML yayınını durdurmasın
+        env:
+          MAIL_KULLANICI: ${{ secrets.MAIL_KULLANICI }}
+          MAIL_SIFRE: ${{ secrets.MAIL_SIFRE }}
+          MAIL_ALICI: ${{ secrets.MAIL_ALICI }}
+        run: python3 rapor_mail.py rapor/atlanan-urunler.csv yayin/saveru-urunler.xml
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -31,6 +31,8 @@ CIKTI_KLASOR = Path(os.environ.get("CIKTI_KLASOR", KLASOR))
 CIKTI = CIKTI_KLASOR / "saveru-urunler.xml"
 ESLESTIRME = KLASOR / "kategori-eslestirme.csv"
 ESLESMEYEN = CIKTI_KLASOR / "eslesmeyen-kategoriler.txt"
+# Atlanan ürün raporu yayın klasörüne (herkese açık) KONMAZ; mail ile gönderilir
+ATLANAN = Path(os.environ.get("RAPOR_KLASOR", KLASOR)) / "atlanan-urunler.csv"
 
 OLCU_ADLARI = {
     "Lütfen yüzük ölçüsü seçiniz.": "Yüzük Ölçüsü",
@@ -98,19 +100,38 @@ def donustur(kaynak_xml):
     eslesmeyen = {}
     root = ET.Element("Root")
     urunler = alt(root, "Urunler")
-    sayac = {"aktarilan": 0, "gramsiz": 0, "kategorisiz": 0, "haric_ayar": 0}
+    sayac = {"aktarilan": 0, "yayinda_degil": 0, "gramsiz": 0, "kategorisiz": 0, "haric_ayar": 0}
+    atlanan = []
+
+    def atla(p, anahtar, neden, detay=""):
+        sayac[anahtar] += 1
+        kombinasyonlar = list(p.find("Combinations")) or [p]
+        atlanan.append({
+            "neden": neden,
+            "detay": detay,
+            "urun_adi": bosluk(p.get("Name")),
+            "model_kodu": p.get("Sku") or "",
+            "stok_kodlari": " ".join(STOK_KODU_ONEK + (k.get("Sku") or p.get("Sku") or "") for k in kombinasyonlar),
+            "barkodlar": " ".join(dict.fromkeys(k.get("Gtin") or "" for k in kombinasyonlar if k.get("Gtin"))),
+            "toptanci_id": p.get("Id"),
+            "toptanci_kategori": " | ".join(bosluk(c.get("Path")) for c in p.find("Categories")),
+            "toptanci_link": p.get("Url") or "",
+        })
 
     for p in ET.fromstring(kaynak_xml).findall("Product"):
         if p.get("Published") != "True":
+            atla(p, "yayinda_degil", "Toptancıda yayında değil")
             continue
         ozellik = {s.get("Name"): s.get("Value") for s in p.find("Specifications")}
         gram = sayi(ozellik.get("Gram"))
         if gram <= 0:
-            sayac["gramsiz"] += 1
+            ham = ozellik.get("Gram")
+            atla(p, "gramsiz", "Gram bilgisi yok/okunamadı",
+                 f"Gram alanı: {ham!r}" if ham else "Özellik alanında gram yok")
             continue
         ayar = re.sub(r"\D", "", ozellik.get("Ayar", "")) or "14"
         if ayar in HARIC_AYARLAR:
-            sayac["haric_ayar"] += 1
+            atla(p, "haric_ayar", f"{ayar} ayar (şimdilik satışa kapalı)", f"{tr_sayi(gram)} gr")
             continue
         ad = bosluk(p.get("Name"))
 
@@ -123,7 +144,7 @@ def donustur(kaynak_xml):
             if saveru and toptanci in yollar and saveru not in kategoriler:
                 kategoriler.append(saveru)
         if not kategoriler:
-            sayac["kategorisiz"] += 1
+            atla(p, "kategorisiz", "Kategori eşleşmedi", "Eşleştirme tablosunda olmayan toptancı kategorisi")
             continue
         ana = kategoriler[0].split("/")[0]
         if ayar == "22" and ana in ("Kolye", "Zincir", "Yüzük", "Küpe"):
@@ -203,6 +224,11 @@ def donustur(kaynak_xml):
     ESLESMEYEN.write_text(
         "".join(f"{y};{n} ürün\n" for y, n in sorted(eslesmeyen.items(), key=lambda x: -x[1])),
         encoding="utf-8")
+    ATLANAN.parent.mkdir(parents=True, exist_ok=True)
+    with open(ATLANAN, "w", encoding="utf-8-sig", newline="") as f:  # utf-8-sig: Excel Türkçe karakterleri doğru açsın
+        yaz = csv.DictWriter(f, fieldnames=list(atlanan[0]) if atlanan else ["neden"], delimiter=";")
+        yaz.writeheader()
+        yaz.writerows(atlanan)
     return sayac, eslesmeyen
 
 
@@ -233,6 +259,7 @@ def main():
         # Toptancı boş/bozuk XML dönerse yayındaki dosyayı ezmemek için hata ver
         sys.exit(f"Çok az ürün aktarıldı ({sayac['aktarilan']}), yayın durduruldu.")
     print(f"Aktarılan ürün: {sayac['aktarilan']}")
+    print(f"Toptancıda yayında olmadığı için atlanan: {sayac['yayinda_degil']}")
     print(f"Gramı olmadığı için atlanan: {sayac['gramsiz']}")
     print(f"Satışa kapalı ayar ({', '.join(sorted(HARIC_AYARLAR))}) olduğu için atlanan: {sayac['haric_ayar']}")
     print(f"Kategorisi eşleşmediği için atlanan: {sayac['kategorisiz']}")
