@@ -8,9 +8,12 @@ Kullanım:
 """
 import csv
 import html
+import http.client
 import os
 import re
 import sys
+import time
+import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -203,15 +206,27 @@ def donustur(kaynak_xml):
     return sayac, eslesmeyen
 
 
+def indir(url, deneme=4):
+    """Toptancı sunucusu bağlantıyı yarıda kesebiliyor; birkaç kez yeniden dener."""
+    for i in range(1, deneme + 1):
+        try:
+            istek = urllib.request.Request(url, headers={"User-Agent": "Saveru-XML/1.0"})
+            with urllib.request.urlopen(istek, timeout=180) as yanit:
+                return yanit.read()
+        except (http.client.IncompleteRead, urllib.error.URLError, TimeoutError, ConnectionError) as hata:
+            if i == deneme:
+                raise
+            print(f"İndirme hatası ({type(hata).__name__}), {i * 30} sn sonra tekrar denenecek ({i}/{deneme})")
+            time.sleep(i * 30)
+
+
 def main():
     if len(sys.argv) > 1:
         kaynak = Path(sys.argv[1]).read_bytes()
     else:
         if not KAYNAK_URL:
             sys.exit("KAYNAK_URL ortam değişkeni tanımlı değil.")
-        istek =urllib.request.Request(KAYNAK_URL, headers={"User-Agent": "Saveru-XML/1.0"})
-        with urllib.request.urlopen(istek, timeout=180) as yanit:
-            kaynak = yanit.read()
+        kaynak = indir(KAYNAK_URL)
     CIKTI_KLASOR.mkdir(parents=True, exist_ok=True)
     sayac, eslesmeyen = donustur(kaynak)
     if sayac["aktarilan"] < 100:
