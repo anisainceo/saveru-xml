@@ -26,6 +26,13 @@ PARA_BIRIMI = "HAS"
 MARKA = "Saveru"
 STOK_KODU_ONEK = "CA-"   # dükkan ürünlerinden ayırt etmek için
 HARIC_AYARLAR = {"22"}   # şimdilik satılmayan ayarlar; 22 ayar satışa açılınca boş küme yap
+# Toptancı kategorisi -> Ticimax etiketi (sayfa adresi). Bu sayfalar Ticimax'te etiketle yönetiliyor;
+# ek_kategori.py etiketleri web servisiyle ürünlere yazar.
+ETIKETLER = {
+    "Trend Ürünler": "/trend-urunler",
+    "Aynı Gün Kargo": "/ayni-gun-kargo",
+    "İndirimdekiler": "/indirimdekiler",
+}
 
 KLASOR = Path(__file__).resolve().parent
 CIKTI_KLASOR = Path(os.environ.get("CIKTI_KLASOR", KLASOR))
@@ -182,6 +189,10 @@ def donustur(kaynak_xml):
         hepsi = alt(u, "Kategoriler")
         for k in kategoriler:
             alt(hepsi, "KategoriTree", k)
+        etiketler = alt(u, "Etiketler")
+        for toptanci, url in ETIKETLER.items():
+            if toptanci in yollar:
+                alt(etiketler, "Etiket", toptanci, Url=url)
         alt(u, "Gram", f"{gram:.2f}")
         alt(u, "OzelAlan1", tr_sayi(gram))
         alt(u, "SeoBaslik", seo_baslik(ad, ayar, gram))

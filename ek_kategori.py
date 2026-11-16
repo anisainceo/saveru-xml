@@ -6,10 +6,16 @@ saveru-urunler.xml'deki <Kategoriler> listesindeki diğer kategorileri
 UrunServis.SaveUrunKategori ile ekler. Yalnızca EKLER, hiçbir kategoriyi silmez;
 yalnızca XML'deki (CA- stok kodlu) ürünlere dokunur.
 
+Etiketler (Trend Ürünler, Aynı Gün Kargo, İndirimdekiler): XML'deki <Etiketler>
+listesine göre ürünlere SaveUrunEtiket ile etiket ekler; toptancının listesinden
+düşen XML ürünlerinden etiketi DeleteUrunEtiket ile kaldırır. Dükkan ürünlerine
+(XML'de olmayan) dokunmaz. Etiket yazımı ayrıca --etiket-uygula ister.
+
 Kullanım:
     TICIMAX_WS_KODU=... python3 ek_kategori.py yayin/saveru-urunler.xml            # deneme: ne ekleneceğini yazar
     TICIMAX_WS_KODU=... python3 ek_kategori.py yayin/saveru-urunler.xml --uygula   # gerçekten ekler
     ... --limit 5   # yalnızca ilk 5 ürün (test için)
+    ... --uygula --etiket-uygula   # etiketleri de yazar
 """
 import argparse
 import os
@@ -137,16 +143,79 @@ def panel_urunleri(kod):
         baslangic += SAYFA
 
 
+def url_anahtar(url):
+    return (url or "").strip().strip("/").lower()
+
+
+def panel_etiketleri(kod):
+    """Panel etiketleri: sayfa adresi (ör. 'trend-urunler') -> (ID, Tanım)."""
+    kok = soap("SelectEtiket", uye(kod) + "<etiketID>0</etiketID>")
+    sonuc = {}
+    for e in kok.iter():
+        if yerel(e.tag) == "Etiket" and cocuk(e, "ID") is not None:
+            sonuc[url_anahtar(metin(e, "Url"))] = (int(metin(e, "ID")), (metin(e, "Tanim") or "").strip())
+    return sonuc
+
+
+def etiketli_urunler(kod, etiket_id):
+    """Bu etiketin bağlı olduğu UrunKartiID kümesi."""
+    kok = soap("SelectUrunEtiket", uye(kod) + f"<EtiketID>{etiket_id}</EtiketID><UrunKartiID>0</UrunKartiID>")
+    return {int(metin(e, "UrunKartiID")) for e in kok.iter()
+            if yerel(e.tag) == "UrunEtiket" and metin(e, "UrunKartiID").isdigit()}
+
+
 def xml_urunleri(yol):
-    """XML'den: (ürün adı, stok kodları, kategori yolları)."""
+    """XML'den: (ürün adı, stok kodları, kategori yolları, etiket adresleri)."""
     sonuc = []
     for u in ET.parse(yol).getroot().iter("Urun"):
         kategoriler = [k.text for k in u.findall("Kategoriler/KategoriTree") if k.text]
         if not kategoriler:
             kategoriler = [u.findtext("KategoriTree")]
         stoklar = [s.text for s in u.findall("UrunSecenek/Secenek/StokKodu") if s.text]
-        sonuc.append((u.findtext("UrunAdi"), stoklar, kategoriler))
+        etiketler = {url_anahtar(e.get("Url")) for e in u.findall("Etiketler/Etiket") if e.get("Url")}
+        sonuc.append((u.findtext("UrunAdi"), stoklar, kategoriler, etiketler))
     return sonuc
+
+
+def urun_etiket_listesi(baglar):
+    return "".join(
+        f"<a:UrunEtiket><a:EtiketID>{eid}</a:EtiketID><a:Sira>0</a:Sira>"
+        f"<a:UrunKartiID>{kid}</a:UrunKartiID></a:UrunEtiket>"
+        for kid, eid in baglar)
+
+
+def etiketleri_esitle(kod, eslesen, uygula):
+    """eslesen: [(UrunKartiID, ad, etiket adresleri)] — yalnızca panelde bulunan XML ürünleri."""
+    panel = panel_etiketleri(kod)
+    istenen_adresler = set().union(*(e for _, _, e in eslesen)) if eslesen else set()
+    eklenecek, silinecek = [], []
+    for adres in sorted(istenen_adresler | {a for a in panel if a in ETIKET_ADRESLERI}):
+        if adres not in panel:
+            print(f"Panelde '/{adres}' adresli etiket yok; atlandı.")
+            continue
+        eid, tanim = panel[adres]
+        mevcut = etiketli_urunler(kod, eid)
+        isteyen = {kid for kid, _, e in eslesen if adres in e}
+        xml_kartlari = {kid for kid, _, _ in eslesen}
+        ekle = sorted(isteyen - mevcut)
+        # Toptancı listesi boş geldiyse (ad değişikliği vb.) toplu silme yapma
+        sil = sorted((mevcut & xml_kartlari) - isteyen) if isteyen else []
+        print(f"Etiket {tanim} (/{adres}, ID {eid}): XML'de {len(isteyen)}, panelde {len(mevcut)}, "
+              f"eklenecek {len(ekle)}, kaldırılacak {len(sil)}")
+        eklenecek += [(kid, eid) for kid in ekle]
+        silinecek += [(kid, eid) for kid in sil]
+
+    if not uygula:
+        print("Etiket deneme modu: hiçbir şey yazılmadı (--etiket-uygula ile yazılır).")
+        return
+    for islem, baglar in (("SaveUrunEtiket", eklenecek), ("DeleteUrunEtiket", silinecek)):
+        for i in range(0, len(baglar), 100):
+            parca = baglar[i:i + 100]
+            soap(islem, uye(kod) + f'<list xmlns:a="{NS_DC}">{urun_etiket_listesi(parca)}</list>')
+            print(f"{islem}: {i + len(parca)}/{len(baglar)}")
+
+
+ETIKET_ADRESLERI = {"trend-urunler", "ayni-gun-kargo", "indirimdekiler"}
 
 
 def main():
@@ -154,6 +223,7 @@ def main():
     ap.add_argument("xml")
     ap.add_argument("--uygula", action="store_true", help="eklemeleri gerçekten yap")
     ap.add_argument("--limit", type=int, default=0, help="yalnızca ilk N ürün (test)")
+    ap.add_argument("--etiket-uygula", action="store_true", help="etiket ekleme/kaldırmayı gerçekten yap")
     a = ap.parse_args()
 
     kod = os.environ.get("TICIMAX_WS_KODU", "").strip()
@@ -166,16 +236,17 @@ def main():
     panel = panel_urunleri(kod)
     print(f"Paneldeki varyasyon stok kodu: {len(panel)}")
 
-    eklenecek, bulunamayan_urun, bulunamayan_kat = [], 0, {}
+    eklenecek, bulunamayan_urun, bulunamayan_kat, eslesen = [], 0, {}, []
     urunler = xml_urunleri(a.xml)
     if a.limit:
         urunler = urunler[:a.limit]
-    for ad, stoklar, kategoriler in urunler:
+    for ad, stoklar, kategoriler, etiketler in urunler:
         kart = next((panel[s] for s in stoklar if s in panel), None)
         if not kart:
             bulunamayan_urun += 1
             continue
         kid, mevcut = kart
+        eslesen.append((kid, ad, etiketler))
         for yol in kategoriler:
             kat_id = yollar.get(yol)
             if kat_id is None:
@@ -193,15 +264,18 @@ def main():
 
     if not a.uygula:
         print("Deneme modu: hiçbir şey yazılmadı (--uygula ile yazılır).")
-        return
-    for i in range(0, len(eklenecek), 100):
-        parca = eklenecek[i:i + 100]
-        liste = "".join(
-            f"<a:UrunKategori><a:KategoriID>{kat_id}</a:KategoriID><a:Sira>0</a:Sira>"
-            f"<a:UrunKartiID>{kid}</a:UrunKartiID></a:UrunKategori>"
-            for kid, kat_id, _, _ in parca)
-        soap("SaveUrunKategori", uye(kod) + f'<list xmlns:a="{NS_DC}">{liste}</list>')
-        print(f"Yazıldı: {i + len(parca)}/{len(eklenecek)}")
+    else:
+        for i in range(0, len(eklenecek), 100):
+            parca = eklenecek[i:i + 100]
+            liste = "".join(
+                f"<a:UrunKategori><a:KategoriID>{kat_id}</a:KategoriID><a:Sira>0</a:Sira>"
+                f"<a:UrunKartiID>{kid}</a:UrunKartiID></a:UrunKategori>"
+                for kid, kat_id, _, _ in parca)
+            soap("SaveUrunKategori", uye(kod) + f'<list xmlns:a="{NS_DC}">{liste}</list>')
+            print(f"Yazıldı: {i + len(parca)}/{len(eklenecek)}")
+
+    # --limit ile kısmi listede kaldırma yapılmasın
+    etiketleri_esitle(kod, eslesen, a.uygula and a.etiket_uygula and not a.limit)
 
 
 if __name__ == "__main__":
