@@ -3,6 +3,10 @@ name: XML güncelle
 on:
   schedule:
     - cron: "17 */3 * * *"   # 3 saatte bir
+    # Rapor maili yalnızca bu iki çalışmada gider (UTC; Türkiye 07:50 ve 19:50 — GitHub
+    # zamanlanmış işleri genelde birkaç dakika geç başlattığı için mail ~08:00 / ~20:00 gelir)
+    - cron: "50 4 * * *"
+    - cron: "50 16 * * *"
   workflow_dispatch:
   push:
     branches: [main]
@@ -34,6 +38,7 @@ jobs:
           RAPOR_KLASOR: rapor
         run: python3 donustur.py
       - name: Aktarılmayan ürün raporunu mail at
+        if: github.event.schedule == '50 4 * * *' || github.event.schedule == '50 16 * * *'
         continue-on-error: true   # mail sorunu XML yayınını durdurmasın
         env:
           MAIL_KULLANICI: ${{ secrets.MAIL_KULLANICI }}
