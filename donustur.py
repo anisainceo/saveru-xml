@@ -20,7 +20,7 @@ from pathlib import Path
 
 KAYNAK_URL = os.environ.get("KAYNAK_URL")  # toptancı linki, GitHub'da gizli (secret) olarak saklanır
 HAS_CARPANI = 0.995      # indirimli fiyat (müşterinin ödediği) = gram × 0,995 has; TL'ye Ticimax HAS kuruyla çevirir
-INDIRIM_ORANI = 0.20     # üstü çizili satış fiyatı = indirimli ÷ 0,80 → etikette tam %20 indirim görünür
+SATIS_CARPANI = 1.25     # üstü çizili satış fiyatı = indirimli × 1,25 → etikette %20 indirim görünür
 PARA_BIRIMI = "HAS"
 MARKA = "Saveru"
 STOK_KODU_ONEK = "CA-"   # dükkan ürünlerinden ayırt etmek için
@@ -165,7 +165,7 @@ def donustur(kaynak_xml):
                 kategoriler.append(yirmiiki)
 
         indirimli = round(gram * HAS_CARPANI, 3)
-        satis = round(indirimli / (1 - INDIRIM_ORANI), 3)
+        satis = round(indirimli * SATIS_CARPANI, 3)
 
         paragraflar = aciklama_metni(p.get("FullDescription"))
         renk = ozellik.get("Renk", "")
