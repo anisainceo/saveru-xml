@@ -156,6 +156,9 @@ def donustur(kaynak_xml):
         if not kategoriler:
             atla(p, "kategorisiz", "Kategori eşleşmedi", "Eşleştirme tablosunda olmayan toptancı kategorisi")
             continue
+        # Hediye alt kategorisindeki ürün /hediye ana sayfasında da listelensin
+        if any(k.startswith("Hediye/") for k in kategoriler) and "Hediye" not in kategoriler:
+            kategoriler.append("Hediye")
         ana = kategoriler[0].split("/")[0]
         if ayar == "22" and ana in ("Kolye", "Zincir", "Yüzük", "Küpe"):
             yirmiiki = f"{ana}/22 Ayar Altın {ana}"
