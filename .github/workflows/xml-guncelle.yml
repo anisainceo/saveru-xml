@@ -3,10 +3,9 @@ name: XML güncelle
 on:
   schedule:
     - cron: "17 */3 * * *"   # 3 saatte bir
-    # Rapor maili yalnızca bu iki çalışmada gider (UTC; Türkiye 07:50 ve 19:50 — GitHub
-    # zamanlanmış işleri genelde birkaç dakika geç başlattığı için mail ~08:00 / ~20:00 gelir)
-    - cron: "50 4 * * *"
-    - cron: "50 16 * * *"
+    # Rapor maili yalnızca bu çalışmada gider: 21:00 UTC = Türkiye 00:00
+    # (GitHub zamanlanmış işleri bazen geç başlatır, mail birkaç dakika–saat gecikebilir)
+    - cron: "0 21 * * *"
   workflow_dispatch:
   push:
     branches: [main]
@@ -25,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.yayin.outputs.page_url }}
+      url: ${{ steps.yayin.outputs.page_url || steps.yayin2.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -38,7 +37,7 @@ jobs:
           RAPOR_KLASOR: rapor
         run: python3 donustur.py
       - name: Aktarılmayan ürün raporunu mail at
-        if: github.event.schedule == '50 4 * * *' || github.event.schedule == '50 16 * * *'
+        if: github.event.schedule == '0 21 * * *'
         continue-on-error: true   # mail sorunu XML yayınını durdurmasın
         env:
           MAIL_KULLANICI: ${{ secrets.MAIL_KULLANICI }}
@@ -50,6 +49,13 @@ jobs:
         with:
           path: yayin
       - id: yayin
+        uses: actions/deploy-pages@v4
+        continue-on-error: true   # GitHub yüklenen dosyayı bazen birkaç saniye geç görüyor
+      - name: Yayın ilk denemede olmadıysa bekle
+        if: steps.yayin.outcome == 'failure'
+        run: sleep 30
+      - id: yayin2
+        if: steps.yayin.outcome == 'failure'
         uses: actions/deploy-pages@v4
       - name: Ek kategori ve etiketleri Ticimax'e yaz (web servisi)
         env:
