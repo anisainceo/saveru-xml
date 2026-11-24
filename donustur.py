@@ -33,6 +33,7 @@ ETIKETLER = {
     "Aynı Gün Kargo": "/ayni-gun-kargo",
     "İndirimdekiler": "/indirimdekiler",
     "Yeniler": "/yeni-gelenler",
+    "Çok Satanlar": "/cok-satanlar",
 }
 
 KLASOR = Path(__file__).resolve().parent

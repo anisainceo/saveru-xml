@@ -6,7 +6,7 @@ saveru-urunler.xml'deki <Kategoriler> listesindeki diğer kategorileri
 UrunServis.SaveUrunKategori ile ekler. Yalnızca EKLER, hiçbir kategoriyi silmez;
 yalnızca XML'deki (CA- stok kodlu) ürünlere dokunur.
 
-Etiketler (Trend Ürünler, Aynı Gün Kargo, İndirimdekiler, Yeni Gelenler): XML'deki <Etiketler>
+Etiketler (Trend Ürünler, Aynı Gün Kargo, İndirimdekiler, Yeni Gelenler, Çok Satanlar): XML'deki <Etiketler>
 listesine göre ürünlere SaveUrunEtiket ile etiket ekler; toptancının listesinden
 düşen XML ürünlerinden etiketi DeleteUrunEtiket ile kaldırır. Dükkan ürünlerine
 (XML'de olmayan) dokunmaz. Etiket yazımı ayrıca --etiket-uygula ister.
@@ -215,7 +215,7 @@ def etiketleri_esitle(kod, eslesen, uygula):
             print(f"{islem}: {i + len(parca)}/{len(baglar)}")
 
 
-ETIKET_ADRESLERI = {"trend-urunler", "ayni-gun-kargo", "indirimdekiler", "yeni-gelenler"}
+ETIKET_ADRESLERI = {"trend-urunler", "ayni-gun-kargo", "indirimdekiler", "yeni-gelenler", "cok-satanlar"}
 
 
 def main():
