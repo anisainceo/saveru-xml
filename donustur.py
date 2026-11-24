@@ -19,9 +19,8 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 KAYNAK_URL = os.environ.get("KAYNAK_URL")  # toptancı linki, GitHub'da gizli (secret) olarak saklanır
-HAS_CARPANI = 0.995      # ürünün gramı bu katsayıyla HAS'a çevrilir (toptancı maliyeti)
-INDIRIMLI_FARK = 0.300   # indirimli fiyat (müşterinin ödediği) = gram × 0,995 + 0,300 has
-INDIRIM_ORANI = 0.20     # üstü çizili satış fiyatı = indirimli ÷ 0,80 → her üründe %20 indirim görünür
+HAS_CARPANI = 0.995      # indirimli fiyat (müşterinin ödediği) = gram × 0,995 has; TL'ye Ticimax HAS kuruyla çevirir
+SATIS_ZAMMI = 0.20       # üstü çizili satış fiyatı = indirimli × 1,20 (indirimliye %20 eklenir)
 PARA_BIRIMI = "HAS"
 MARKA = "Saveru"
 STOK_KODU_ONEK = "CA-"   # dükkan ürünlerinden ayırt etmek için
@@ -165,8 +164,8 @@ def donustur(kaynak_xml):
             if yirmiiki not in kategoriler:
                 kategoriler.append(yirmiiki)
 
-        indirimli = round(gram * HAS_CARPANI + INDIRIMLI_FARK, 3)
-        satis = round(indirimli / (1 - INDIRIM_ORANI), 3)
+        indirimli = round(gram * HAS_CARPANI, 3)
+        satis = round(indirimli * (1 + SATIS_ZAMMI), 3)
 
         paragraflar = aciklama_metni(p.get("FullDescription"))
         renk = ozellik.get("Renk", "")
