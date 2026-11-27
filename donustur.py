@@ -33,6 +33,8 @@ HARIC_AYARLAR = {"22"}   # şimdilik satılmayan ayarlar; 22 ayar satışa açı
 #      (27.11.2026'da bu biçimdeki 317 ürünün 316'sı Cetaş kataloğu/bayileriyle doğrulandı)
 HARIC_MARKA_KELIMELERI = ("cetaş", "cetas", "ema jewel", "çağla x ema", "cagla x ema")
 HARIC_KOD_DESENI = re.compile(r"^X[A-Z]{0,2}\d", re.I)
+#   4) Barkodda Cetaş öneki var: 869CTS… (X ile başlamayan Cetaş kodlarını da yakalar, ör. 37-140NAAY, Z2431NAAY)
+HARIC_BARKOD_PARCALARI = ("CTS",)
 # Toptancı kategorisi -> Ticimax etiketi (sayfa adresi). Bu sayfalar Ticimax'te etiketle yönetiliyor;
 # ek_kategori.py etiketleri web servisiyle ürünlere yazar.
 ETIKETLER = {
@@ -129,6 +131,10 @@ def haric_marka(p):
     for k in kodlar:
         if HARIC_KOD_DESENI.match(k.strip()):
             return f"Cetaş kod biçimi: {k}"
+    barkodlar = [p.get("Gtin") or ""] + [k.get("Gtin") or "" for k in (p.find("Combinations") or [])]
+    for b in barkodlar:
+        if any(parca in b.upper() for parca in HARIC_BARKOD_PARCALARI):
+            return f"Cetaş barkodu: {b}"
     return ""
 
 
