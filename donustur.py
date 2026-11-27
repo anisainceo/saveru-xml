@@ -25,6 +25,10 @@ PARA_BIRIMI = "HAS"
 MARKA = "Saveru"
 STOK_KODU_ONEK = "CA-"   # dükkan ürünlerinden ayırt etmek için
 HARIC_AYARLAR = {"22"}   # şimdilik satılmayan ayarlar; 22 ayar satışa açılınca boş küme yap
+# Hiç aktarılmayacak ürünler: toptancı model kodu (Sku, "CA-" öneki olmadan) ya da adında geçen marka.
+# 27.11.2026: Cetaş markalı ürün (X11180NAV1) bayisi olmadığımız için kaldırıldı.
+HARIC_MODEL_KODLARI = {"X11180NAV1"}
+HARIC_AD_KELIMELERI = ("cetaş", "cetas")
 # Toptancı kategorisi -> Ticimax etiketi (sayfa adresi). Bu sayfalar Ticimax'te etiketle yönetiliyor;
 # ek_kategori.py etiketleri web servisiyle ürünlere yazar.
 ETIKETLER = {
@@ -109,7 +113,7 @@ def donustur(kaynak_xml):
     eslesmeyen = {}
     root = ET.Element("Root")
     urunler = alt(root, "Urunler")
-    sayac = {"aktarilan": 0, "yayinda_degil": 0, "gramsiz": 0, "kategorisiz": 0, "haric_ayar": 0}
+    sayac = {"aktarilan": 0, "yayinda_degil": 0, "gramsiz": 0, "kategorisiz": 0, "haric_ayar": 0, "haric_urun": 0}
     atlanan = []
 
     def atla(p, anahtar, neden, detay=""):
@@ -130,6 +134,10 @@ def donustur(kaynak_xml):
     for p in ET.fromstring(kaynak_xml).findall("Product"):
         if p.get("Published") != "True":
             atla(p, "yayinda_degil", "Toptancıda yayında değil")
+            continue
+        kodlar = {p.get("Sku") or ""} | {k.get("Sku") or "" for k in (p.find("Combinations") or [])}
+        if kodlar & HARIC_MODEL_KODLARI or any(w in (p.get("Name") or "").lower() for w in HARIC_AD_KELIMELERI):
+            atla(p, "haric_urun", "Bilerek satışa kapatıldı (hariç tutulan ürün/marka)")
             continue
         ozellik = {s.get("Name"): s.get("Value") for s in p.find("Specifications")}
         gram = sayi(ozellik.get("Gram"))
@@ -279,6 +287,7 @@ def main():
     print(f"Gramı olmadığı için atlanan: {sayac['gramsiz']}")
     print(f"Satışa kapalı ayar ({', '.join(sorted(HARIC_AYARLAR))}) olduğu için atlanan: {sayac['haric_ayar']}")
     print(f"Kategorisi eşleşmediği için atlanan: {sayac['kategorisiz']}")
+    print(f"Bilerek hariç tutulan: {sayac['haric_urun']}")
     if eslesmeyen:
         print(f"Tabloda olmayan {len(eslesmeyen)} toptancı kategorisi var -> {ESLESMEYEN.name}")
     print(f"Çıktı: {CIKTI}")
