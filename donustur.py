@@ -25,10 +25,14 @@ PARA_BIRIMI = "HAS"
 MARKA = "Saveru"
 STOK_KODU_ONEK = "CA-"   # dükkan ürünlerinden ayırt etmek için
 HARIC_AYARLAR = {"22"}   # şimdilik satılmayan ayarlar; 22 ayar satışa açılınca boş küme yap
-# Hiç aktarılmayacak ürünler: toptancı model kodu (Sku, "CA-" öneki olmadan) ya da adında geçen marka.
-# 27.11.2026: Cetaş markalı ürün (X11180NAV1) bayisi olmadığımız için kaldırıldı.
-HARIC_MODEL_KODLARI = {"X11180NAV1"}
-HARIC_AD_KELIMELERI = ("cetaş", "cetas")
+# Hiç aktarılmayacak markalar (bayisi değiliz, telif riski). 27.11.2026: Cetaş ve Ema Jewellery.
+# Üç ayrı kontrol; biri tutması yeterli:
+#   1) Toptancı kategori yolunda marka adı geçiyor (ör. "Koleksiyonlar >> Ema Jewellery")
+#   2) Ürün adında / açıklamasında marka adı geçiyor
+#   3) Model kodu Cetaş kod biçiminde: X + (en çok 2 harf) + rakam, ör. X11180NAV1, XD10563NAAY, XF11680BAAY
+#      (27.11.2026'da bu biçimdeki 317 ürünün 316'sı Cetaş kataloğu/bayileriyle doğrulandı)
+HARIC_MARKA_KELIMELERI = ("cetaş", "cetas", "ema jewel", "çağla x ema", "cagla x ema")
+HARIC_KOD_DESENI = re.compile(r"^X[A-Z]{0,2}\d", re.I)
 # Toptancı kategorisi -> Ticimax etiketi (sayfa adresi). Bu sayfalar Ticimax'te etiketle yönetiliyor;
 # ek_kategori.py etiketleri web servisiyle ürünlere yazar.
 ETIKETLER = {
@@ -107,6 +111,27 @@ def alt(ust, ad, metin=None, **attrib):
     return e
 
 
+def kucuk(metin):
+    return (metin or "").replace("İ", "i").replace("I", "ı").lower()
+
+
+def haric_marka(p):
+    """Ürün hariç tutulan bir markaya aitse nedenini, değilse boş döndürür."""
+    yollar = [kucuk(c.get("Path")) for c in (p.find("Categories") or [])]
+    for w in HARIC_MARKA_KELIMELERI:
+        if any(w in y for y in yollar):
+            return f"kategori: {w}"
+    metin = kucuk(p.get("Name")) + " " + kucuk(p.get("FullDescription"))
+    for w in HARIC_MARKA_KELIMELERI:
+        if w in metin:
+            return f"ad/açıklama: {w}"
+    kodlar = [p.get("Sku") or ""] + [k.get("Sku") or "" for k in (p.find("Combinations") or [])]
+    for k in kodlar:
+        if HARIC_KOD_DESENI.match(k.strip()):
+            return f"Cetaş kod biçimi: {k}"
+    return ""
+
+
 def donustur(kaynak_xml):
     eslestirme = eslestirme_oku()
     bilinen = {k for k, _ in eslestirme}
@@ -135,9 +160,9 @@ def donustur(kaynak_xml):
         if p.get("Published") != "True":
             atla(p, "yayinda_degil", "Toptancıda yayında değil")
             continue
-        kodlar = {p.get("Sku") or ""} | {k.get("Sku") or "" for k in (p.find("Combinations") or [])}
-        if kodlar & HARIC_MODEL_KODLARI or any(w in (p.get("Name") or "").lower() for w in HARIC_AD_KELIMELERI):
-            atla(p, "haric_urun", "Bilerek satışa kapatıldı (hariç tutulan ürün/marka)")
+        neden = haric_marka(p)
+        if neden:
+            atla(p, "haric_urun", "Hariç tutulan marka (Cetaş/Ema)", neden)
             continue
         ozellik = {s.get("Name"): s.get("Value") for s in p.find("Specifications")}
         gram = sayi(ozellik.get("Gram"))
@@ -287,7 +312,7 @@ def main():
     print(f"Gramı olmadığı için atlanan: {sayac['gramsiz']}")
     print(f"Satışa kapalı ayar ({', '.join(sorted(HARIC_AYARLAR))}) olduğu için atlanan: {sayac['haric_ayar']}")
     print(f"Kategorisi eşleşmediği için atlanan: {sayac['kategorisiz']}")
-    print(f"Bilerek hariç tutulan: {sayac['haric_urun']}")
+    print(f"Hariç tutulan marka (Cetaş/Ema): {sayac['haric_urun']}")
     if eslesmeyen:
         print(f"Tabloda olmayan {len(eslesmeyen)} toptancı kategorisi var -> {ESLESMEYEN.name}")
     print(f"Çıktı: {CIKTI}")
